@@ -1,0 +1,40 @@
+name: quotes
+
+# Delayed quotes for the Screener 500 app. Every 10 minutes during US market
+# hours (13:00–21:59 UTC covers 9:00–16:59 ET in both EDT and EST), weekdays.
+# 10-minute cadence keeps GitHub Pages under its ~10 builds/hour soft limit.
+on:
+  schedule:
+    - cron: '*/10 13-21 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: quotes
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch batch quotes
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: python scripts/fetch_quotes.py
+      - name: Commit if changed
+        run: |
+          git config user.name "screener500-bot"
+          git config user.email "screener500-bot@users.noreply.github.com"
+          git add quotes.json
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "quotes $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+            git push
+          fi
